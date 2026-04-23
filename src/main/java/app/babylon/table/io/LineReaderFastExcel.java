@@ -14,7 +14,6 @@ import org.dhatim.fastexcel.reader.Sheet;
 
 import app.babylon.table.column.ColumnName;
 
-
 public class LineReaderFastExcel implements LineReader
 {
     private final ColumnName specificSheetName;

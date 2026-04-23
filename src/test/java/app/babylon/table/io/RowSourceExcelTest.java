@@ -25,7 +25,8 @@ import app.babylon.table.column.ColumnObject;
 import app.babylon.table.column.ColumnTypes;
 import app.babylon.table.plans.TablePlanRead;
 
-class RowSourceExcelTest {
+class RowSourceExcelTest
+{
 
     private static final ColumnName CATEGORY = ColumnName.of("Category");
     private static final ColumnName NOTIONAL = ColumnName.of("Notional");
@@ -36,20 +37,23 @@ class RowSourceExcelTest {
     private static final TableName CASHFLOWS = TableName.of("Cashflows");
 
     @Test
-    void shouldReadTypedCashflowsFromInMemoryWorkbook() throws Exception {
+    void shouldReadTypedCashflowsFromInMemoryWorkbook() throws Exception
+    {
         TableColumnar table = readCashflows(inMemoryWorkbookStreamSource());
 
         assertCashflows(table);
     }
 
     @Test
-    void shouldReadTypedCashflowsFromClassPathWorkbook() {
+    void shouldReadTypedCashflowsFromClassPathWorkbook()
+    {
         TableColumnar table = readCashflows(StreamSources.fromClass(RowSourceExcelTest.class, "Cashflows.xlsx"));
 
         assertCashflows(table);
     }
 
-    private static TableColumnar readCashflows(StreamSource streamSource) {
+    private static TableColumnar readCashflows(StreamSource streamSource)
+    {
         RowSourceExcel rowSource = RowSourceExcel.builder().withStreamSource(streamSource)
                 .withHeaderStrategy(new HeaderStrategyExplicitRow(0))
                 .withSpecificSheetName(ColumnName.of(CASHFLOWS.getOriginal())).build();
@@ -61,7 +65,8 @@ class RowSourceExcelTest {
         return plan.execute(rowSource);
     }
 
-    private static void assertCashflows(TableColumnar table) {
+    private static void assertCashflows(TableColumnar table)
+    {
         assertEquals(CASHFLOWS, table.getName());
         assertEquals(ColumnTypes.STRING, table.getType(CATEGORY));
         assertEquals(ColumnTypes.DECIMAL, table.getType(NOTIONAL));
@@ -104,24 +109,30 @@ class RowSourceExcelTest {
         assertEquals(LocalDate.of(2031, 1, 1), paymentDates.get(4));
     }
 
-    private static StreamSource inMemoryWorkbookStreamSource() throws Exception {
+    private static StreamSource inMemoryWorkbookStreamSource() throws Exception
+    {
         byte[] workbookBytes = createWorkbookBytes();
-        return new StreamSource() {
+        return new StreamSource()
+        {
             @Override
-            public String getName() {
+            public String getName()
+            {
                 return "cashflows.xlsx";
             }
 
             @Override
-            public InputStream openStream() {
+            public InputStream openStream()
+            {
                 return new ByteArrayInputStream(workbookBytes);
             }
         };
     }
 
-    private static byte[] createWorkbookBytes() throws Exception {
+    private static byte[] createWorkbookBytes() throws Exception
+    {
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                Workbook workbook = new Workbook(outputStream, "babylon-table-io", "1.2026")) {
+                Workbook workbook = new Workbook(outputStream, "babylon-table-io", "1.2026"))
+        {
             Worksheet sheet = workbook.newWorksheet("Cashflows");
             sheet.value(0, 0, "Category");
             sheet.value(0, 1, "Notional");
@@ -147,7 +158,8 @@ class RowSourceExcelTest {
     }
 
     private static void writeCashflowRow(Worksheet sheet, int rowIndex, BigDecimal notional, BigDecimal amount,
-            LocalDate paymentDate) {
+            LocalDate paymentDate)
+    {
         sheet.value(rowIndex, 0, "Pay");
         sheet.value(rowIndex, 1, notional);
         sheet.value(rowIndex, 2, "1Y");
