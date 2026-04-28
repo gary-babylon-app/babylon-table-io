@@ -35,6 +35,9 @@ class RowSourceExcelTest
     private static final ColumnName CURRENCY = ColumnName.of("Currency");
     private static final ColumnName PAYMENT_DATE = ColumnName.of("PaymentDate");
     private static final TableName CASHFLOWS = TableName.of("Cashflows");
+    private static final ColumnName TRADE_ID = ColumnName.of("TradeId");
+    private static final ColumnName SIDE = ColumnName.of("Side");
+    private static final TableName TRADES = TableName.of("Trades");
 
     @Test
     void shouldReadTypedCashflowsFromInMemoryWorkbook() throws Exception
@@ -50,6 +53,25 @@ class RowSourceExcelTest
         TableColumnar table = readCashflows(StreamSources.fromClass(RowSourceExcelTest.class, "Cashflows.xlsx"));
 
         assertCashflows(table);
+    }
+
+    @Test
+    void shouldStopReadingTableAtEmptyRow() throws Exception
+    {
+        RowSourceExcel rowSource = RowSourceExcel.builder().withStreamSource(emptyRowTerminatedWorkbookStreamSource())
+                .withSpecificSheetName(ColumnName.of(TRADES.getOriginal())).build();
+        TablePlanRead plan = new TablePlanRead().withTableName(TRADES).withColumnType(TRADE_ID, ColumnTypes.STRING)
+                .withColumnType(SIDE, ColumnTypes.STRING);
+
+        TableColumnar table = plan.execute(rowSource);
+
+        assertEquals(2, table.getRowCount());
+        ColumnObject<String> tradeIds = table.getString(TRADE_ID);
+        ColumnObject<String> sides = table.getString(SIDE);
+        assertEquals("T1", tradeIds.get(0));
+        assertEquals("Pay", sides.get(0));
+        assertEquals("T2", tradeIds.get(1));
+        assertEquals("Receive", sides.get(1));
     }
 
     private static TableColumnar readCashflows(StreamSource streamSource)
@@ -128,6 +150,25 @@ class RowSourceExcelTest
         };
     }
 
+    private static StreamSource emptyRowTerminatedWorkbookStreamSource() throws Exception
+    {
+        byte[] workbookBytes = createEmptyRowTerminatedWorkbookBytes();
+        return new StreamSource()
+        {
+            @Override
+            public String getName()
+            {
+                return "trades.xlsx";
+            }
+
+            @Override
+            public InputStream openStream()
+            {
+                return new ByteArrayInputStream(workbookBytes);
+            }
+        };
+    }
+
     private static byte[] createWorkbookBytes() throws Exception
     {
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -151,6 +192,28 @@ class RowSourceExcelTest
                     LocalDate.of(2030, 1, 1));
             writeCashflowRow(sheet, 5, new BigDecimal("10000000.00"), new BigDecimal("300000.00"),
                     LocalDate.of(2031, 1, 1));
+
+            workbook.finish();
+            return outputStream.toByteArray();
+        }
+    }
+
+    private static byte[] createEmptyRowTerminatedWorkbookBytes() throws Exception
+    {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                Workbook workbook = new Workbook(outputStream, "babylon-table-io", "1.2026"))
+        {
+            Worksheet sheet = workbook.newWorksheet("Trades");
+            sheet.value(1, 1, "TradeId");
+            sheet.value(1, 2, "Side");
+            sheet.value(2, 1, "T1");
+            sheet.value(2, 2, "Pay");
+            sheet.value(3, 1, "T2");
+            sheet.value(3, 2, "Receive");
+            sheet.value(4, 1, "");
+            sheet.value(4, 2, "");
+            sheet.value(5, 1, "T3");
+            sheet.value(5, 2, "Pay");
 
             workbook.finish();
             return outputStream.toByteArray();

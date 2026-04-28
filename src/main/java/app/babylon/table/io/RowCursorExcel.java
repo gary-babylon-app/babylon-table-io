@@ -42,7 +42,8 @@ public final class RowCursorExcel extends RowCursorLineReaderCommon
 
     private static LineReader createLineReader(InputStream inputStream, Builder builder)
     {
-        return new LineReaderFastExcel(toBufferedStream(inputStream), builder.specificSheetName);
+        return new LineReaderFastExcel(toBufferedStream(inputStream), builder.specificSheetName, builder.headerStrategy,
+                builder.selectedColumns);
     }
 
     private static BufferedInputStream toBufferedStream(InputStream inputStream)
