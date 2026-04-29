@@ -56,7 +56,7 @@ class RowSourceExcelTest
     }
 
     @Test
-    void shouldStopReadingTableAtEmptyRow() throws Exception
+    void shouldStopReadingTableAtThreeConsecutiveEmptyRows() throws Exception
     {
         RowSourceExcel rowSource = RowSourceExcel.builder().withStreamSource(emptyRowTerminatedWorkbookStreamSource())
                 .withSpecificSheetName(ColumnName.of(TRADES.getOriginal())).build();
@@ -212,8 +212,12 @@ class RowSourceExcelTest
             sheet.value(3, 2, "Receive");
             sheet.value(4, 1, "");
             sheet.value(4, 2, "");
-            sheet.value(5, 1, "T3");
-            sheet.value(5, 2, "Pay");
+            sheet.value(5, 1, "");
+            sheet.value(5, 2, "");
+            sheet.value(6, 1, "");
+            sheet.value(6, 2, "");
+            sheet.value(7, 1, "T3");
+            sheet.value(7, 2, "Pay");
 
             workbook.finish();
             return outputStream.toByteArray();

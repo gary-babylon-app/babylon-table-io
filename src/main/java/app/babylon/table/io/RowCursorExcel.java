@@ -8,16 +8,18 @@ import app.babylon.table.column.ColumnName;
 
 public final class RowCursorExcel extends RowCursorLineReaderCommon
 {
-    private final HeaderStrategy headerStrategy;
-    private final boolean stripping;
+    private static final int EMPTY_ROW_LIMIT = 3;
+
     private final ColumnName specificSheetName;
+    private Row currentRow;
+    private int emptyRowCount;
 
     RowCursorExcel(InputStream inputStream, Builder builder)
     {
         super(createLineReader(ArgumentCheck.nonNull(inputStream), builder), builder);
-        this.headerStrategy = ArgumentCheck.nonNull(builder.headerStrategy);
-        this.stripping = builder.stripping;
         this.specificSheetName = builder.specificSheetName;
+        this.currentRow = null;
+        this.emptyRowCount = 0;
     }
 
     public static Builder builder()
@@ -27,12 +29,12 @@ public final class RowCursorExcel extends RowCursorLineReaderCommon
 
     public HeaderStrategy getHeaderStrategy()
     {
-        return this.headerStrategy;
+        return super.getHeaderStrategy();
     }
 
     public boolean isStripping()
     {
-        return this.stripping;
+        return super.isStripping();
     }
 
     public ColumnName getSpecificSheetName()
@@ -40,10 +42,40 @@ public final class RowCursorExcel extends RowCursorLineReaderCommon
         return this.specificSheetName;
     }
 
+    @Override
+    public boolean next()
+    {
+        while (super.next())
+        {
+            Row row = super.current();
+            if (row.isEmpty())
+            {
+                ++this.emptyRowCount;
+                if (this.emptyRowCount >= EMPTY_ROW_LIMIT)
+                {
+                    this.currentRow = null;
+                    return false;
+                }
+                continue;
+            }
+            this.emptyRowCount = 0;
+            this.currentRow = row;
+            return true;
+        }
+
+        this.currentRow = null;
+        return false;
+    }
+
+    @Override
+    public Row current()
+    {
+        return ArgumentCheck.nonNull(this.currentRow, "current row is not available until next() succeeds");
+    }
+
     private static LineReader createLineReader(InputStream inputStream, Builder builder)
     {
-        return new LineReaderFastExcel(toBufferedStream(inputStream), builder.specificSheetName, builder.headerStrategy,
-                builder.selectedColumns);
+        return new LineReaderFastExcel(toBufferedStream(inputStream), builder.specificSheetName);
     }
 
     private static BufferedInputStream toBufferedStream(InputStream inputStream)
@@ -62,6 +94,7 @@ public final class RowCursorExcel extends RowCursorLineReaderCommon
         private Builder()
         {
             super();
+            this.headerStrategy = new HeaderStrategyExcelAuto();
             this.specificSheetName = null;
         }
 
