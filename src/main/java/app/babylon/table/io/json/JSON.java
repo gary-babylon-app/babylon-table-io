@@ -40,6 +40,11 @@ import app.babylon.text.Strings;
 
 public final class JSON
 {
+    public enum Format
+    {
+        ROW_ORIENTED, COLUMNAR
+    }
+
     private static final String COLUMN_TYPES = "columnTypes";
     private static final String COLUMNS = "columns";
     private static final String DECIMAL = "Decimal";
