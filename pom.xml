@@ -5,7 +5,7 @@
 
     <groupId>app.babylon</groupId>
     <artifactId>babylon-table-io</artifactId>
-    <version>0.1.3</version>
+    <version>0.1.4-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>babylon-table-io</name>
