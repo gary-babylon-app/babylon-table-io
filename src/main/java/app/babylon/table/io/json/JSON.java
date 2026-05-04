@@ -35,7 +35,9 @@ import app.babylon.table.column.ColumnInt;
 import app.babylon.table.column.ColumnLong;
 import app.babylon.table.column.ColumnName;
 import app.babylon.table.column.ColumnObject;
-import app.babylon.table.transform.TransformToDecimal;
+import app.babylon.table.column.ColumnTypes;
+import app.babylon.table.transform.Transform;
+import app.babylon.table.transform.TransformStringToType;
 import app.babylon.text.Strings;
 
 public final class JSON
@@ -481,7 +483,12 @@ public final class JSON
             return table;
         }
 
-        return table.apply(TransformToDecimal.of(decimalColumns.toArray(new ColumnName[0])));
+        List<Transform> transforms = new ArrayList<>();
+        for (ColumnName decimalColumn : decimalColumns)
+        {
+            transforms.add(TransformStringToType.builder(ColumnTypes.DECIMAL, decimalColumn).build());
+        }
+        return table.apply(transforms);
     }
 
     private static TableDescription parseDescription(JsonObject jsonObject)
