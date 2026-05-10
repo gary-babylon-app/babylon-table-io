@@ -1,6 +1,8 @@
-package app.babylon.table.plans;
+package app.babylon.table.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -26,10 +28,10 @@ import app.babylon.table.column.ColumnLong;
 import app.babylon.table.column.ColumnName;
 import app.babylon.table.column.ColumnObject;
 import app.babylon.table.column.ColumnTypes;
-import app.babylon.table.io.RowSourceExcel;
-import app.babylon.table.io.SinkStream;
+import app.babylon.table.plans.TablePlanRead;
+import app.babylon.table.plans.TablePlanWrite;
 
-class TablePlanWriteExcelTest
+class TableSinkExcelTest
 {
     private static final TableName MIXED_TYPES = TableName.of("MixedTypes");
     private static final ColumnName BYTE_VALUE = ColumnName.of("ByteValue");
@@ -54,6 +56,41 @@ class TablePlanWriteExcelTest
         assertCellFormats(bytes);
     }
 
+    @Test
+    void genericWritePlanCanWriteToExcelSink()
+    {
+        TableColumnar table = mixedTypesTable();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        SinkStream sinkStream = sinkStream(out);
+
+        new TablePlanWrite().withSink(TableSinkExcel.of(sinkStream)).execute(table);
+
+        TableColumnar actual = readFromExcel(out.toByteArray());
+        assertEquals(table.getRowCount(), actual.getRowCount());
+        assertPrimitiveValues(actual);
+        assertObjectValues(actual);
+    }
+
+    @Test
+    void directOutputStreamIsNotClosed()
+    {
+        CloseTrackingOutputStream out = new CloseTrackingOutputStream();
+
+        new TablePlanWrite().withSink(TableSinkExcel.of(out)).execute(mixedTypesTable());
+
+        assertFalse(out.closed);
+    }
+
+    @Test
+    void sinkStreamOpenedBySinkIsClosed()
+    {
+        CloseTrackingOutputStream out = new CloseTrackingOutputStream();
+
+        new TablePlanWrite().withSink(TableSinkExcel.of(sinkStream(out))).execute(mixedTypesTable());
+
+        assertTrue(out.closed);
+    }
+
     private static TableColumnar mixedTypesTable()
     {
         ColumnByte byteValues = ColumnByte.builder(BYTE_VALUE).add((byte) 7).add((byte) -3).build();
@@ -74,7 +111,13 @@ class TablePlanWriteExcelTest
     private static byte[] writeToExcel(TableColumnar table)
     {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        SinkStream sink = new SinkStream()
+        new TablePlanWrite().withSink(TableSinkExcel.of(out)).execute(table);
+        return out.toByteArray();
+    }
+
+    private static SinkStream sinkStream(ByteArrayOutputStream out)
+    {
+        return new SinkStream()
         {
             @Override
             public String getName()
@@ -88,9 +131,17 @@ class TablePlanWriteExcelTest
                 return out;
             }
         };
+    }
 
-        new TablePlanWriteExcel().withSink(sink).execute(table);
-        return out.toByteArray();
+    private static final class CloseTrackingOutputStream extends ByteArrayOutputStream
+    {
+        private boolean closed;
+
+        @Override
+        public void close()
+        {
+            this.closed = true;
+        }
     }
 
     private static TableColumnar readFromExcel(byte[] bytes)
