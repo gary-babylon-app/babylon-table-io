@@ -146,8 +146,8 @@ class TableSinkExcelTest
 
     private static TableColumnar readFromExcel(byte[] bytes)
     {
-        RowSourceExcel rowSource = RowSourceExcel.builder().withStreamSource(streamSource(bytes))
-                .withSpecificSheetName(ColumnName.of(MIXED_TYPES.getOriginal())).build();
+        RowSource rowSource = ReadOptionsExcel.builder().withSpecificSheetName(ColumnName.of(MIXED_TYPES.getOriginal()))
+                .build().createSource(streamSource(bytes));
 
         TablePlanRead plan = new TablePlanRead().withTableName(MIXED_TYPES).withColumnType(BYTE_VALUE, ColumnTypes.BYTE)
                 .withColumnType(INT_VALUE, ColumnTypes.INT).withColumnType(LONG_VALUE, ColumnTypes.LONG)

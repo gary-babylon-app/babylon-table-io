@@ -58,8 +58,8 @@ class RowSourceExcelTest
     @Test
     void shouldStopReadingTableAtThreeConsecutiveEmptyRows() throws Exception
     {
-        RowSourceExcel rowSource = RowSourceExcel.builder().withStreamSource(emptyRowTerminatedWorkbookStreamSource())
-                .withSpecificSheetName(ColumnName.of(TRADES.getOriginal())).build();
+        RowSource rowSource = ReadOptionsExcel.builder().withSpecificSheetName(ColumnName.of(TRADES.getOriginal()))
+                .build().createSource(emptyRowTerminatedWorkbookStreamSource());
         TablePlanRead plan = new TablePlanRead().withTableName(TRADES).withColumnType(TRADE_ID, ColumnTypes.STRING)
                 .withColumnType(SIDE, ColumnTypes.STRING);
 
@@ -76,11 +76,11 @@ class RowSourceExcelTest
 
     private static TableColumnar readCashflows(StreamSource streamSource)
     {
-        RowSourceExcel rowSource = RowSourceExcel.builder().withStreamSource(streamSource)
-                .withHeaderStrategy(new HeaderStrategyExplicitRow(0))
-                .withSpecificSheetName(ColumnName.of(CASHFLOWS.getOriginal())).build();
+        RowSource rowSource = ReadOptionsExcel.builder().withSpecificSheetName(ColumnName.of(CASHFLOWS.getOriginal()))
+                .build().createSource(streamSource);
 
-        TablePlanRead plan = new TablePlanRead().withTableName(CASHFLOWS).withColumnType(CATEGORY, ColumnTypes.STRING)
+        TablePlanRead plan = new TablePlanRead().withTableName(CASHFLOWS)
+                .withHeaderStrategy(new HeaderStrategyExplicitRow(0)).withColumnType(CATEGORY, ColumnTypes.STRING)
                 .withColumnType(FREQUENCY, ColumnTypes.PERIOD).withColumnTypes(ColumnTypes.DECIMAL, NOTIONAL, AMOUNT)
                 .withColumnType(CURRENCY, ColumnTypes.CURRENCY).withColumnType(PAYMENT_DATE, ColumnTypes.LOCALDATE);
 
