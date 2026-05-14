@@ -12,6 +12,7 @@ package app.babylon.table.io.json;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -23,6 +24,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import app.babylon.io.StreamSources;
 import app.babylon.table.TableColumnar;
 import app.babylon.table.TableDescription;
 import app.babylon.table.TableName;
@@ -36,6 +38,7 @@ import app.babylon.table.column.ColumnLong;
 import app.babylon.table.column.ColumnName;
 import app.babylon.table.column.ColumnObject;
 import app.babylon.table.column.ColumnTypes;
+import app.babylon.table.plans.TablePlanReadJson;
 import app.babylon.table.transform.Transform;
 import app.babylon.table.transform.TransformStringToType;
 import app.babylon.text.Strings;
@@ -213,8 +216,15 @@ public final class JSON
 
     public static TableColumnar fromJsonColumnar(String s, boolean applyColumnTypes)
     {
-        JsonObject jsonObject = JsonParser.parseString(s).getAsJsonObject();
-        return fromJsonColumnar(jsonObject, applyColumnTypes);
+        return new TablePlanReadJson().withFormat(Format.COLUMNAR).withApplyColumnTypes(applyColumnTypes)
+                .execute(StreamSources.fromString(s, "json"));
+    }
+
+    public static TableColumnar fromJsonColumnar(String s, boolean applyColumnTypes,
+            Collection<ColumnName> selectedColumns)
+    {
+        return new TablePlanReadJson().withFormat(Format.COLUMNAR).withApplyColumnTypes(applyColumnTypes)
+                .withSelectedColumns(selectedColumns).execute(StreamSources.fromString(s, "json"));
     }
 
     public static String toJson(ColumnLong column, ToStringSettings settings)
@@ -298,8 +308,15 @@ public final class JSON
 
     public static TableColumnar toTableRowOriented(String s, boolean applyColumnTypes)
     {
-        JsonObject jsonObject = JsonParser.parseString(s).getAsJsonObject();
-        return toTableRowOriented(jsonObject, applyColumnTypes);
+        return new TablePlanReadJson().withApplyColumnTypes(applyColumnTypes)
+                .execute(StreamSources.fromString(s, "json"));
+    }
+
+    public static TableColumnar toTableRowOriented(String s, boolean applyColumnTypes,
+            Collection<ColumnName> selectedColumns)
+    {
+        return new TablePlanReadJson().withApplyColumnTypes(applyColumnTypes).withSelectedColumns(selectedColumns)
+                .execute(StreamSources.fromString(s, "json"));
     }
 
     public static TableColumnar fromJsonColumnar(JsonObject jsonObject)

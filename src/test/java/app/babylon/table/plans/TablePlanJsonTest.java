@@ -11,13 +11,18 @@
 package app.babylon.table.plans;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 
 import com.google.gson.JsonParser;
 
+import app.babylon.io.StreamSource;
+import app.babylon.io.StreamSources;
 import app.babylon.table.TableColumnar;
 import app.babylon.table.TableDescription;
 import app.babylon.table.TableName;
@@ -92,35 +97,65 @@ public class TablePlanJsonTest
     {
         String json = new TablePlanWriteJson().execute(sampleTable());
 
-        TableColumnar table = new TablePlanReadJson().execute(json);
+        TableColumnar table = new TablePlanReadJson().execute(jsonSource(json));
 
         assertEquals(3, table.getColumnCount());
         assertEquals(1, table.getRowCount());
         assertEquals("Test Description", table.getDescription().getValue());
-        assertEquals(new BigDecimal("12.34"), table.getDecimal(ColumnName.of("amount")).get(0));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
         assertEquals("5", table.getString(ColumnName.of("quantity")).get(0));
         assertEquals("Hello", table.getString(ColumnName.of("note")).get(0));
     }
 
     @Test
-    public void readJsonDefaultsToApplyingColumnTypes()
+    public void readJsonDefaultsToIgnoringColumnTypes()
     {
         String json = new TablePlanWriteJson().execute(sampleTable());
 
-        TableColumnar table = new TablePlanReadJson().execute(json);
+        TableColumnar table = new TablePlanReadJson().execute(jsonSource(json));
 
-        assertEquals(ColumnTypes.DECIMAL, table.getType(ColumnName.of("amount")));
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
     }
 
     @Test
-    public void readJsonCanSkipColumnTypes()
+    public void readJsonCanApplyColumnTypes()
     {
         String json = new TablePlanWriteJson().execute(sampleTable());
 
-        TableColumnar table = new TablePlanReadJson().withApplyColumnTypes(false).execute(json);
+        TableColumnar table = new TablePlanReadJson().withApplyColumnTypes(true).execute(jsonSource(json));
 
+        assertEquals(ColumnTypes.DECIMAL, table.getType(ColumnName.of("amount")));
+        assertEquals(new BigDecimal("12.34"), table.getDecimal(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
+    public void readJsonCanSelectRowOrientedColumns()
+    {
+        String json = new TablePlanWriteJson().execute(sampleTable());
+
+        TableColumnar table = new TablePlanReadJson()
+                .withSelectedColumns(ColumnName.of("amount"), ColumnName.of("note")).execute(jsonSource(json));
+
+        assertEquals(2, table.getColumnCount());
+        assertArrayEquals(new ColumnName[]
+        {ColumnName.of("amount"), ColumnName.of("note")}, table.getColumnNames());
         assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
         assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+        assertEquals("Hello", table.getString(ColumnName.of("note")).get(0));
+    }
+
+    @Test
+    public void readJsonCanSelectRowOrientedColumnsFromInputStream()
+    {
+        String json = new TablePlanWriteJson().execute(sampleTable());
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
+
+        TableColumnar table = new TablePlanReadJson().withSelectedColumn(ColumnName.of("note")).execute(inputStream);
+
+        assertEquals(1, table.getColumnCount());
+        assertArrayEquals(new ColumnName[]
+        {ColumnName.of("note")}, table.getColumnNames());
+        assertEquals("Hello", table.getString(ColumnName.of("note")).get(0));
     }
 
     @Test
@@ -141,11 +176,54 @@ public class TablePlanJsonTest
                 }
                 """;
 
-        TableColumnar table = new TablePlanReadJson().withFormat(JSON.Format.COLUMNAR).withApplyColumnTypes(false)
-                .execute(json);
+        TableColumnar table = new TablePlanReadJson().withFormat(JSON.Format.COLUMNAR).execute(jsonSource(json));
 
         assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
         assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
+    public void readJsonColumnarCanSelectColumns()
+    {
+        String json = columnarJsonWithColumnTypes();
+
+        TableColumnar table = new TablePlanReadJson().withFormat(JSON.Format.COLUMNAR)
+                .withSelectedColumns(ColumnName.of("amount"), ColumnName.of("note")).execute(jsonSource(json));
+
+        assertEquals(2, table.getColumnCount());
+        assertArrayEquals(new ColumnName[]
+        {ColumnName.of("amount"), ColumnName.of("note")}, table.getColumnNames());
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+        assertEquals("Hello", table.getString(ColumnName.of("note")).get(0));
+    }
+
+    @Test
+    public void readJsonColumnarSkipsUnselectedColumnArrays()
+    {
+        String json = """
+                {
+                  "columns": [
+                    { "amount": ["12.34", "56.78"] },
+                    { "quantity": ["5"] },
+                    { "note": ["Hello", "World"] }
+                  ],
+                  "description": "Test Description",
+                  "name": "TestTable"
+                }
+                """;
+
+        TableColumnar table = new TablePlanReadJson().withFormat(JSON.Format.COLUMNAR)
+                .withSelectedColumns(ColumnName.of("amount"), ColumnName.of("note")).execute(jsonSource(json));
+
+        assertEquals(2, table.getColumnCount());
+        assertEquals(2, table.getRowCount());
+        assertArrayEquals(new ColumnName[]
+        {ColumnName.of("amount"), ColumnName.of("note")}, table.getColumnNames());
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+        assertEquals("56.78", table.getString(ColumnName.of("amount")).get(1));
+        assertEquals("Hello", table.getString(ColumnName.of("note")).get(0));
+        assertEquals("World", table.getString(ColumnName.of("note")).get(1));
     }
 
     @Test
@@ -153,7 +231,7 @@ public class TablePlanJsonTest
     {
         String json = new TablePlanWriteJson().withFormat(JSON.Format.COLUMNAR).execute(sampleTable());
 
-        TableColumnar table = new TablePlanReadJson().withFormat(JSON.Format.COLUMNAR).execute(json);
+        TableColumnar table = new TablePlanReadJson().withFormat(JSON.Format.COLUMNAR).execute(jsonSource(json));
 
         assertEquals(3, table.getColumnCount());
         assertEquals(1, table.getRowCount());
@@ -166,5 +244,28 @@ public class TablePlanJsonTest
     private static String compact(String json)
     {
         return JsonParser.parseString(json).toString();
+    }
+
+    private static StreamSource jsonSource(String json)
+    {
+        return StreamSources.fromString(json, "json");
+    }
+
+    private static String columnarJsonWithColumnTypes()
+    {
+        return """
+                {
+                  "columns": [
+                    { "amount": ["12.34"] },
+                    { "quantity": ["5"] },
+                    { "note": ["Hello"] }
+                  ],
+                  "columnTypes": {
+                    "amount": "Decimal"
+                  },
+                  "description": "Test Description",
+                  "name": "TestTable"
+                }
+                """;
     }
 }
