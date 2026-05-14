@@ -25,6 +25,7 @@ import app.babylon.table.Tables;
 import app.babylon.table.column.ColumnInt;
 import app.babylon.table.column.ColumnName;
 import app.babylon.table.column.ColumnObject;
+import app.babylon.table.column.ColumnTypes;
 import app.babylon.table.io.json.JSON;
 
 public class TablePlanJsonTest
@@ -99,6 +100,52 @@ public class TablePlanJsonTest
         assertEquals(new BigDecimal("12.34"), table.getDecimal(ColumnName.of("amount")).get(0));
         assertEquals("5", table.getString(ColumnName.of("quantity")).get(0));
         assertEquals("Hello", table.getString(ColumnName.of("note")).get(0));
+    }
+
+    @Test
+    public void readJsonDefaultsToApplyingColumnTypes()
+    {
+        String json = new TablePlanWriteJson().execute(sampleTable());
+
+        TableColumnar table = new TablePlanReadJson().execute(json);
+
+        assertEquals(ColumnTypes.DECIMAL, table.getType(ColumnName.of("amount")));
+    }
+
+    @Test
+    public void readJsonCanSkipColumnTypes()
+    {
+        String json = new TablePlanWriteJson().execute(sampleTable());
+
+        TableColumnar table = new TablePlanReadJson().withApplyColumnTypes(false).execute(json);
+
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
+    public void readJsonColumnarCanSkipColumnTypes()
+    {
+        String json = """
+                {
+                  "columns": [
+                    { "amount": ["12.34"] },
+                    { "quantity": ["5"] },
+                    { "note": ["Hello"] }
+                  ],
+                  "columnTypes": {
+                    "amount": "Decimal"
+                  },
+                  "description": "Test Description",
+                  "name": "TestTable"
+                }
+                """;
+
+        TableColumnar table = new TablePlanReadJson().withFormat(JSON.Format.COLUMNAR).withApplyColumnTypes(false)
+                .execute(json);
+
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
     }
 
     @Test

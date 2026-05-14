@@ -17,6 +17,7 @@ import app.babylon.table.io.json.JSON;
 public class TablePlanReadJson
 {
     private JSON.Format format;
+    private boolean applyColumnTypes = true;
 
     public TablePlanReadJson()
     {
@@ -34,13 +35,24 @@ public class TablePlanReadJson
         return this.format;
     }
 
+    public TablePlanReadJson withApplyColumnTypes(boolean applyColumnTypes)
+    {
+        this.applyColumnTypes = applyColumnTypes;
+        return this;
+    }
+
+    public boolean getApplyColumnTypes()
+    {
+        return this.applyColumnTypes;
+    }
+
     public TableColumnar execute(String json)
     {
         String checkedJson = ArgumentCheck.nonNull(json);
         if (JSON.Format.COLUMNAR.equals(this.format))
         {
-            return JSON.fromJsonColumnar(checkedJson);
+            return JSON.fromJsonColumnar(checkedJson, this.applyColumnTypes);
         }
-        return JSON.toTableRowOriented(checkedJson);
+        return JSON.toTableRowOriented(checkedJson, this.applyColumnTypes);
     }
 }

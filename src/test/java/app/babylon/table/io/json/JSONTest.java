@@ -136,6 +136,39 @@ public class JSONTest
     }
 
     @Test
+    public void toTableRowOriented_defaultsToApplyingColumnTypes()
+    {
+        String json = JSON.toJsonRowOriented(sampleTable(), ToStringSettings.standard());
+
+        TableColumnar table = JSON.toTableRowOriented(json);
+
+        assertEquals(ColumnTypes.DECIMAL, table.getType(ColumnName.of("amount")));
+        assertEquals(new BigDecimal("12.34"), table.getDecimal(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
+    public void toTableRowOriented_canSkipColumnTypes()
+    {
+        String json = JSON.toJsonRowOriented(sampleTable(), ToStringSettings.standard());
+
+        TableColumnar table = JSON.toTableRowOriented(json, false);
+
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
+    public void toTableRowOrientedJsonObject_canSkipColumnTypes()
+    {
+        JsonObject jsonObject = JSON.toJsonObjectRowOriented(sampleTable(), ToStringSettings.standard());
+
+        TableColumnar table = JSON.toTableRowOriented(jsonObject, false);
+
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
     public void fromJsonRowOriented_parsesJsonObject()
     {
         TableColumnar table = sampleTable();
@@ -166,6 +199,35 @@ public class JSONTest
         assertEquals("12.34", roundTripped.getString(ColumnName.of("amount")).get(0));
         assertEquals("5", roundTripped.getString(ColumnName.of("quantity")).get(0));
         assertEquals("Hello", roundTripped.getString(ColumnName.of("note")).get(0));
+    }
+
+    @Test
+    public void fromJsonColumnar_defaultsToApplyingColumnTypes()
+    {
+        TableColumnar table = JSON.fromJsonColumnar(columnarJsonWithColumnTypes());
+
+        assertEquals(ColumnTypes.DECIMAL, table.getType(ColumnName.of("amount")));
+        assertEquals(new BigDecimal("12.34"), table.getDecimal(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
+    public void fromJsonColumnar_canSkipColumnTypes()
+    {
+        TableColumnar table = JSON.fromJsonColumnar(columnarJsonWithColumnTypes(), false);
+
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
+    }
+
+    @Test
+    public void fromJsonColumnarJsonObject_canSkipColumnTypes()
+    {
+        JsonObject jsonObject = JsonParser.parseString(columnarJsonWithColumnTypes()).getAsJsonObject();
+
+        TableColumnar table = JSON.fromJsonColumnar(jsonObject, false);
+
+        assertEquals(ColumnTypes.STRING, table.getType(ColumnName.of("amount")));
+        assertEquals("12.34", table.getString(ColumnName.of("amount")).get(0));
     }
 
     @Test
@@ -323,6 +385,24 @@ public class JSONTest
     private static String compact(String json)
     {
         return JsonParser.parseString(json).toString();
+    }
+
+    private static String columnarJsonWithColumnTypes()
+    {
+        return """
+                {
+                  "columns": [
+                    { "amount": ["12.34"] },
+                    { "quantity": ["5"] },
+                    { "note": ["Hello"] }
+                  ],
+                  "columnTypes": {
+                    "amount": "Decimal"
+                  },
+                  "description": "Test Description",
+                  "name": "TestTable"
+                }
+                """;
     }
 
     private static void assertTableJsonEquivalent(TableColumnar expected, TableColumnar actual)

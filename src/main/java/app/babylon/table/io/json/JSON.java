@@ -208,8 +208,13 @@ public final class JSON
 
     public static TableColumnar fromJsonColumnar(String s)
     {
+        return fromJsonColumnar(s, true);
+    }
+
+    public static TableColumnar fromJsonColumnar(String s, boolean applyColumnTypes)
+    {
         JsonObject jsonObject = JsonParser.parseString(s).getAsJsonObject();
-        return fromJsonColumnar(jsonObject);
+        return fromJsonColumnar(jsonObject, applyColumnTypes);
     }
 
     public static String toJson(ColumnLong column, ToStringSettings settings)
@@ -288,11 +293,21 @@ public final class JSON
 
     public static TableColumnar toTableRowOriented(String s)
     {
+        return toTableRowOriented(s, true);
+    }
+
+    public static TableColumnar toTableRowOriented(String s, boolean applyColumnTypes)
+    {
         JsonObject jsonObject = JsonParser.parseString(s).getAsJsonObject();
-        return fromJsonRowOriented(jsonObject);
+        return toTableRowOriented(jsonObject, applyColumnTypes);
     }
 
     public static TableColumnar fromJsonColumnar(JsonObject jsonObject)
+    {
+        return fromJsonColumnar(jsonObject, true);
+    }
+
+    public static TableColumnar fromJsonColumnar(JsonObject jsonObject, boolean applyColumnTypes)
     {
         List<JsonColumn> columns = readJsonColumns(jsonObject.get(COLUMNS).getAsJsonArray());
         validateColumnarLengths(columns);
@@ -300,7 +315,7 @@ public final class JSON
         addColumnarRows(columnBuilders, columns);
 
         TableColumnar table = newTable(jsonObject, columnBuilders);
-        return applyColumnTypeTransformations(jsonObject, table);
+        return applyColumnTypeTransformations(jsonObject, table, applyColumnTypes);
     }
 
     private static ColumnObject.Builder<String>[] newStringBuilders(List<JsonColumn> columns)
@@ -371,6 +386,16 @@ public final class JSON
 
     public static TableColumnar fromJsonRowOriented(JsonObject jsonObject)
     {
+        return fromJsonRowOriented(jsonObject, true);
+    }
+
+    public static TableColumnar toTableRowOriented(JsonObject jsonObject, boolean applyColumnTypes)
+    {
+        return fromJsonRowOriented(jsonObject, applyColumnTypes);
+    }
+
+    public static TableColumnar fromJsonRowOriented(JsonObject jsonObject, boolean applyColumnTypes)
+    {
         JsonArray jsonColumns = jsonObject.get(COLUMNS).getAsJsonArray();
         JsonArray jsonRows = jsonObject.get(ROWS).getAsJsonArray();
 
@@ -388,7 +413,7 @@ public final class JSON
         }
 
         TableColumnar table = newTable(jsonObject, columnBuilders);
-        return applyColumnTypeTransformations(jsonObject, table);
+        return applyColumnTypeTransformations(jsonObject, table, applyColumnTypes);
     }
 
     private static TableColumnar newTable(JsonObject jsonObject, ColumnObject.Builder<String>[] columnBuilders)
@@ -463,6 +488,17 @@ public final class JSON
 
     private static TableColumnar applyColumnTypeTransformations(JsonObject jsonObject, TableColumnar table)
     {
+        return applyColumnTypeTransformations(jsonObject, table, true);
+    }
+
+    private static TableColumnar applyColumnTypeTransformations(JsonObject jsonObject, TableColumnar table,
+            boolean applyColumnTypes)
+    {
+        if (!applyColumnTypes)
+        {
+            return table;
+        }
+
         JsonObject columnTypes = jsonObject.getAsJsonObject(COLUMN_TYPES);
         if (columnTypes == null)
         {
