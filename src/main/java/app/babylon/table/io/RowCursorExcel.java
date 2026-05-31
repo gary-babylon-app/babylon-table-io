@@ -23,7 +23,7 @@ final class RowCursorExcel extends RowCursorLineReaderCommon
 
     private static LineReader createLineReader(InputStream inputStream, ColumnName specificSheetName)
     {
-        return new LineReaderFastExcel(toBufferedStream(inputStream), specificSheetName);
+        return new ExcelTableRowReader(toBufferedStream(inputStream), specificSheetName);
     }
 
     private static BufferedInputStream toBufferedStream(InputStream inputStream)

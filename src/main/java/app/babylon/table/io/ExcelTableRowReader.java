@@ -14,15 +14,15 @@ import org.dhatim.fastexcel.reader.Sheet;
 
 import app.babylon.table.column.ColumnName;
 
-public class LineReaderFastExcel implements LineReader
+public class ExcelTableRowReader implements LineReader
 {
     private final ColumnName specificSheetName;
     private final ReadableWorkbook workbook;
     private final Stream<Row> rowStream;
     private final Iterator<Row> rowIterator;
-    private final RowBuffer current;
+    private ByteStringSlices current;
 
-    public LineReaderFastExcel(BufferedInputStream instream, ColumnName specificSheetName)
+    public ExcelTableRowReader(BufferedInputStream instream, ColumnName specificSheetName)
     {
         this.specificSheetName = specificSheetName;
 
@@ -42,7 +42,7 @@ public class LineReaderFastExcel implements LineReader
             }
             this.rowStream = sheet.openStream();
             this.rowIterator = this.rowStream.iterator();
-            this.current = new RowBuffer();
+            this.current = null;
         }
         catch (IOException e)
         {
@@ -53,23 +53,24 @@ public class LineReaderFastExcel implements LineReader
     @Override
     public boolean next() throws IOException
     {
-        RowBuffer row = this.current;
-        row.clear();
         if (!this.rowIterator.hasNext())
         {
+            this.current = null;
             return false;
         }
 
         Row sourceRow = this.rowIterator.next();
+        StringSlices.Builder row = new StringSlices.Builder();
         for (int col = 0; col < sourceRow.getCellCount(); col++)
         {
             appendCell(row, getCellValue(sourceRow.getOptionalCell(col).orElse(null)));
         }
+        this.current = row.build().toByteStringSlices();
         return true;
     }
 
     @Override
-    public app.babylon.table.io.Row current()
+    public ByteStringSlices current()
     {
         return this.current;
     }
@@ -79,14 +80,11 @@ public class LineReaderFastExcel implements LineReader
         return cell == null ? "" : cell.getRawValue();
     }
 
-    private static void appendCell(RowBuffer row, String value)
+    private static void appendCell(StringSlices.Builder row, String value)
     {
         if (value != null)
         {
-            for (int i = 0; i < value.length(); ++i)
-            {
-                row.append(value.charAt(i));
-            }
+            row.append(value);
         }
         row.finishField();
     }
