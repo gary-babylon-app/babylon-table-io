@@ -10,7 +10,6 @@ import app.babylon.lang.Is;
 import app.babylon.table.column.ColumnName;
 import app.babylon.table.transform.DateFormatInference;
 import app.babylon.text.BigDecimals;
-import app.babylon.text.Bytes;
 import app.babylon.text.Strings;
 
 public class HeaderStrategyExcelAuto implements HeaderStrategy
@@ -48,7 +47,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
     @Override
     public HeaderDetection detect(RowStreamMarkable rowStream, Set<ColumnName> selectedColumns) throws IOException
     {
-        List<ByteStringSlices> rows = new ArrayList<>();
+        List<RowValues> rows = new ArrayList<>();
         while (rows.size() < this.scanLimit && rowStream.next())
         {
             rows.add(rowStream.current());
@@ -71,12 +70,12 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return detect(rowStream, selectedColumns);
     }
 
-    private static Candidate detectCandidate(List<ByteStringSlices> rows, Set<ColumnName> selectedColumns)
+    private static Candidate detectCandidate(List<RowValues> rows, Set<ColumnName> selectedColumns)
     {
         Candidate best = null;
         for (int i = 0; i < rows.size(); i++)
         {
-            ByteStringSlices row = rows.get(i);
+            RowValues row = rows.get(i);
             Window window = window(row);
             if (window.isEmpty())
             {
@@ -99,7 +98,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return best == null ? fallback(rows) : best;
     }
 
-    private static Candidate fallback(List<ByteStringSlices> rows)
+    private static Candidate fallback(List<RowValues> rows)
     {
         for (int i = 0; i < rows.size(); i++)
         {
@@ -112,7 +111,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return new Candidate(0, 0, -1, 0.0d);
     }
 
-    private static Window window(ByteStringSlices row)
+    private static Window window(RowValues row)
     {
         int startCol = -1;
         int endCol = -1;
@@ -135,7 +134,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return startCol < 0 ? new Window(0, -1) : new Window(startCol, endCol);
     }
 
-    private static double headerScore(ByteStringSlices row, Window window)
+    private static double headerScore(RowValues row, Window window)
     {
         int width = window.width();
         int nonBlank = 0;
@@ -177,13 +176,13 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return score;
     }
 
-    private static double stabilityScore(List<ByteStringSlices> rows, int headerIndex, Window window)
+    private static double stabilityScore(List<RowValues> rows, int headerIndex, Window window)
     {
         int checked = 0;
         double score = 0.0d;
         for (int i = headerIndex + 1; i < rows.size() && checked < LOOKAHEAD_ROW_COUNT; i++)
         {
-            ByteStringSlices row = rows.get(i);
+            RowValues row = rows.get(i);
             if (isEmpty(row, window))
             {
                 continue;
@@ -204,7 +203,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return checked == 0 ? 0.0d : score / checked;
     }
 
-    private static double dataLikeShare(ByteStringSlices row, Window window)
+    private static double dataLikeShare(RowValues row, Window window)
     {
         int dataLike = 0;
         for (int col = window.startCol(); col <= window.endCol(); col++)
@@ -218,7 +217,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return dataLike / (double) Math.max(1, window.width());
     }
 
-    private static double selectedColumnScore(ByteStringSlices row, Window window, Set<ColumnName> selectedColumns)
+    private static double selectedColumnScore(RowValues row, Window window, Set<ColumnName> selectedColumns)
     {
         if (Is.empty(selectedColumns))
         {
@@ -236,7 +235,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return 2.0d * matched / Math.max(1, selectedColumns.size());
     }
 
-    private static HeaderDetection headerDetection(ByteStringSlices headerRow, int startCol, int endCol,
+    private static HeaderDetection headerDetection(RowValues headerRow, int startCol, int endCol,
             Set<ColumnName> selectedColumns)
     {
         if (endCol < startCol)
@@ -272,7 +271,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
                 selectedPositions.stream().mapToInt(Integer::intValue).toArray());
     }
 
-    private static boolean isEmpty(ByteStringSlices row, Window window)
+    private static boolean isEmpty(RowValues row, Window window)
     {
         for (int col = window.startCol(); col <= window.endCol(); col++)
         {
@@ -284,22 +283,16 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return true;
     }
 
-    private static boolean isBlankField(ByteStringSlices row, int fieldIndex)
+    private static boolean isBlankField(RowValues row, int fieldIndex)
     {
         if (fieldIndex < 0 || fieldIndex >= row.size())
         {
             return true;
         }
-        int start = row.start(fieldIndex);
-        int end = row.end(fieldIndex);
-        if (start >= end)
-        {
-            return true;
-        }
-        return Bytes.isStripxEmpty(row.getByteString(), start, end);
+        return Strings.isEmpty(Strings.stripx(row.getString(fieldIndex)));
     }
 
-    private static ColumnName parseColumnName(ByteStringSlices row, int fieldIndex)
+    private static ColumnName parseColumnName(RowValues row, int fieldIndex)
     {
         if (fieldIndex < 0 || fieldIndex >= row.size())
         {
@@ -313,7 +306,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return ColumnName.parse(value);
     }
 
-    private static CharSequence fieldText(ByteStringSlices row, int fieldIndex)
+    private static CharSequence fieldText(RowValues row, int fieldIndex)
     {
         if (fieldIndex < 0 || fieldIndex >= row.size())
         {
@@ -323,7 +316,7 @@ public class HeaderStrategyExcelAuto implements HeaderStrategy
         return value == null ? "" : value;
     }
 
-    private static CharSequence strippedFieldText(ByteStringSlices row, int fieldIndex)
+    private static CharSequence strippedFieldText(RowValues row, int fieldIndex)
     {
         return Strings.stripx(fieldText(row, fieldIndex));
     }
