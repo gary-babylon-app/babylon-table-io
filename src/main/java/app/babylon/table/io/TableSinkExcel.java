@@ -10,24 +10,17 @@ import app.babylon.table.TableColumnar;
 
 public final class TableSinkExcel implements TableSink
 {
-    private final SinkStream sinkStream;
     private final OutputStream outputStream;
     private final ExcelContext context;
 
     private TableSinkExcel(Builder builder)
     {
-        this.sinkStream = builder.sinkStream;
         this.outputStream = builder.outputStream;
-        if (this.sinkStream == null && this.outputStream == null)
+        if (this.outputStream == null)
         {
-            throw new IllegalArgumentException("Expected sinkStream or outputStream.");
+            throw new IllegalArgumentException("Expected outputStream.");
         }
         this.context = resolveContext(builder.context);
-    }
-
-    public static TableSinkExcel of(SinkStream sinkStream)
-    {
-        return builder().withSinkStream(sinkStream).build();
     }
 
     public static TableSinkExcel of(OutputStream outputStream)
@@ -43,23 +36,13 @@ public final class TableSinkExcel implements TableSink
     @Override
     public String getName()
     {
-        return this.sinkStream == null ? "excel-output-stream" : this.sinkStream.getName();
+        return "excel-output-stream";
     }
 
     @Override
     public void write(TableColumnar table) throws IOException
     {
-        TableColumnar checkedTable = ArgumentCheck.nonNull(table);
-        if (this.outputStream != null)
-        {
-            writeWorkbook(checkedTable, this.outputStream);
-            return;
-        }
-
-        try (OutputStream out = this.sinkStream.openStream())
-        {
-            writeWorkbook(checkedTable, out);
-        }
+        writeWorkbook(ArgumentCheck.nonNull(table), this.outputStream);
     }
 
     private void writeWorkbook(TableColumnar table, OutputStream out) throws IOException
@@ -86,28 +69,18 @@ public final class TableSinkExcel implements TableSink
 
     public static final class Builder
     {
-        private SinkStream sinkStream;
         private OutputStream outputStream;
         private ExcelContext context;
 
         private Builder()
         {
-            this.sinkStream = null;
             this.outputStream = null;
             this.context = ExcelContext.defaultContext();
-        }
-
-        public Builder withSinkStream(SinkStream sinkStream)
-        {
-            this.sinkStream = ArgumentCheck.nonNull(sinkStream);
-            this.outputStream = null;
-            return this;
         }
 
         public Builder withOutputStream(OutputStream outputStream)
         {
             this.outputStream = ArgumentCheck.nonNull(outputStream);
-            this.sinkStream = null;
             return this;
         }
 

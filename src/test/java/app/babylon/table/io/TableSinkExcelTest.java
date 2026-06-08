@@ -2,12 +2,10 @@ package app.babylon.table.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -61,9 +59,8 @@ class TableSinkExcelTest
     {
         TableColumnar table = mixedTypesTable();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        SinkStream sinkStream = sinkStream(out);
 
-        new TablePlanWrite().withSink(TableSinkExcel.of(sinkStream)).execute(table);
+        new TablePlanWrite().withSink(TableSinkExcel.of(out)).execute(table);
 
         TableColumnar actual = readFromExcel(out.toByteArray());
         assertEquals(table.getRowCount(), actual.getRowCount());
@@ -79,16 +76,6 @@ class TableSinkExcelTest
         new TablePlanWrite().withSink(TableSinkExcel.of(out)).execute(mixedTypesTable());
 
         assertFalse(out.closed);
-    }
-
-    @Test
-    void sinkStreamOpenedBySinkIsClosed()
-    {
-        CloseTrackingOutputStream out = new CloseTrackingOutputStream();
-
-        new TablePlanWrite().withSink(TableSinkExcel.of(sinkStream(out))).execute(mixedTypesTable());
-
-        assertTrue(out.closed);
     }
 
     private static TableColumnar mixedTypesTable()
@@ -113,24 +100,6 @@ class TableSinkExcelTest
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         new TablePlanWrite().withSink(TableSinkExcel.of(out)).execute(table);
         return out.toByteArray();
-    }
-
-    private static SinkStream sinkStream(ByteArrayOutputStream out)
-    {
-        return new SinkStream()
-        {
-            @Override
-            public String getName()
-            {
-                return "mixed-types.xlsx";
-            }
-
-            @Override
-            public OutputStream openStream()
-            {
-                return out;
-            }
-        };
     }
 
     private static final class CloseTrackingOutputStream extends ByteArrayOutputStream

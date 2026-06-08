@@ -6,6 +6,7 @@ import app.babylon.table.column.Column;
 import app.babylon.table.column.ColumnName;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -61,6 +62,25 @@ public final class RecordWriterPdf
         catch (IOException e)
         {
             throw new IllegalArgumentException("Unable to write table PDF: " + path, e);
+        }
+    }
+
+    public static void write(TableColumnar table, OutputStream outputStream) throws IOException
+    {
+        write(table, null, outputStream);
+    }
+
+    public static void write(TableColumnar table, TableColumnar footer, OutputStream outputStream) throws IOException
+    {
+        write(table, null, footer, outputStream);
+    }
+
+    public static void write(TableColumnar table, TableColumnar header, TableColumnar footer, OutputStream outputStream)
+            throws IOException
+    {
+        try (PDDocument document = create(table, header, footer))
+        {
+            document.save(outputStream);
         }
     }
 
