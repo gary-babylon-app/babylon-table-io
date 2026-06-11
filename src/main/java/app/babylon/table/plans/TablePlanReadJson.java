@@ -28,7 +28,7 @@ import java.util.Set;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 
-import app.babylon.io.StreamSource;
+import app.babylon.io.DataResource;
 import app.babylon.lang.ArgumentCheck;
 import app.babylon.table.TableColumnar;
 import app.babylon.table.TableDescription;
@@ -123,10 +123,10 @@ public class TablePlanReadJson
         return read(ArgumentCheck.nonNull(inputStream));
     }
 
-    public TableColumnar execute(StreamSource streamSource)
+    public TableColumnar execute(DataResource streamSource)
     {
-        StreamSource checkedStreamSource = ArgumentCheck.nonNull(streamSource);
-        try (InputStream inputStream = checkedStreamSource.openStream())
+        DataResource checkedDataResource = ArgumentCheck.nonNull(streamSource);
+        try (InputStream inputStream = checkedDataResource.openStream())
         {
             return execute(inputStream);
         }

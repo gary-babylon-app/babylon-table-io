@@ -16,8 +16,8 @@ import org.dhatim.fastexcel.Workbook;
 import org.dhatim.fastexcel.Worksheet;
 import org.junit.jupiter.api.Test;
 
-import app.babylon.io.StreamSource;
-import app.babylon.io.StreamSources;
+import app.babylon.io.DataResource;
+import app.babylon.io.DataResources;
 import app.babylon.table.TableColumnar;
 import app.babylon.table.TableName;
 import app.babylon.table.column.ColumnName;
@@ -42,7 +42,7 @@ class RowSourceExcelTest
     @Test
     void shouldReadTypedCashflowsFromInMemoryWorkbook() throws Exception
     {
-        TableColumnar table = readCashflows(inMemoryWorkbookStreamSource());
+        TableColumnar table = readCashflows(inMemoryWorkbookDataResource());
 
         assertCashflows(table);
     }
@@ -50,7 +50,7 @@ class RowSourceExcelTest
     @Test
     void shouldReadTypedCashflowsFromClassPathWorkbook()
     {
-        TableColumnar table = readCashflows(StreamSources.fromClass(RowSourceExcelTest.class, "Cashflows.xlsx"));
+        TableColumnar table = readCashflows(DataResources.fromClass(RowSourceExcelTest.class, "Cashflows.xlsx"));
 
         assertCashflows(table);
     }
@@ -59,7 +59,7 @@ class RowSourceExcelTest
     void shouldStopReadingTableAtThreeConsecutiveEmptyRows() throws Exception
     {
         RowSource rowSource = ReadOptionsExcel.builder().withSpecificSheetName(ColumnName.of(TRADES.getOriginal()))
-                .build().createSource(emptyRowTerminatedWorkbookStreamSource());
+                .build().createSource(emptyRowTerminatedWorkbookDataResource());
         TablePlanRead plan = new TablePlanRead().withTableName(TRADES).withColumnType(TRADE_ID, ColumnTypes.STRING)
                 .withColumnType(SIDE, ColumnTypes.STRING);
 
@@ -74,7 +74,7 @@ class RowSourceExcelTest
         assertEquals("Receive", sides.get(1));
     }
 
-    private static TableColumnar readCashflows(StreamSource streamSource)
+    private static TableColumnar readCashflows(DataResource streamSource)
     {
         RowSource rowSource = ReadOptionsExcel.builder().withSpecificSheetName(ColumnName.of(CASHFLOWS.getOriginal()))
                 .build().createSource(streamSource);
@@ -131,10 +131,10 @@ class RowSourceExcelTest
         assertEquals(LocalDate.of(2031, 1, 1), paymentDates.get(4));
     }
 
-    private static StreamSource inMemoryWorkbookStreamSource() throws Exception
+    private static DataResource inMemoryWorkbookDataResource() throws Exception
     {
         byte[] workbookBytes = createWorkbookBytes();
-        return new StreamSource()
+        return new DataResource()
         {
             @Override
             public String getName()
@@ -150,10 +150,10 @@ class RowSourceExcelTest
         };
     }
 
-    private static StreamSource emptyRowTerminatedWorkbookStreamSource() throws Exception
+    private static DataResource emptyRowTerminatedWorkbookDataResource() throws Exception
     {
         byte[] workbookBytes = createEmptyRowTerminatedWorkbookBytes();
-        return new StreamSource()
+        return new DataResource()
         {
             @Override
             public String getName()

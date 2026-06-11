@@ -12,7 +12,7 @@ package app.babylon.table.io;
 
 import java.io.InputStream;
 
-import app.babylon.io.StreamSource;
+import app.babylon.io.DataResource;
 import app.babylon.lang.ArgumentCheck;
 import app.babylon.table.column.ColumnName;
 
@@ -33,7 +33,7 @@ public record ReadOptionsExcel(ColumnName specificSheetName)
         return new RowCursorExcel(ArgumentCheck.nonNull(inputStream), this);
     }
 
-    public RowSource createSource(StreamSource streamSource)
+    public RowSource createSource(DataResource streamSource)
     {
         return new RowSourceExcel(ArgumentCheck.nonNull(streamSource), this);
     }

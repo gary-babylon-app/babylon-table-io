@@ -24,7 +24,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import app.babylon.io.StreamSources;
+import app.babylon.io.DataResources;
 import app.babylon.table.TableColumnar;
 import app.babylon.table.TableDescription;
 import app.babylon.table.TableName;
@@ -217,14 +217,14 @@ public final class JSON
     public static TableColumnar fromJsonColumnar(String s, boolean applyColumnTypes)
     {
         return new TablePlanReadJson().withFormat(Format.COLUMNAR).withApplyColumnTypes(applyColumnTypes)
-                .execute(StreamSources.fromString(s, "json"));
+                .execute(DataResources.fromString(s, "json"));
     }
 
     public static TableColumnar fromJsonColumnar(String s, boolean applyColumnTypes,
             Collection<ColumnName> selectedColumns)
     {
         return new TablePlanReadJson().withFormat(Format.COLUMNAR).withApplyColumnTypes(applyColumnTypes)
-                .withSelectedColumns(selectedColumns).execute(StreamSources.fromString(s, "json"));
+                .withSelectedColumns(selectedColumns).execute(DataResources.fromString(s, "json"));
     }
 
     public static String toJson(ColumnLong column, ToStringSettings settings)
@@ -309,14 +309,14 @@ public final class JSON
     public static TableColumnar toTableRowOriented(String s, boolean applyColumnTypes)
     {
         return new TablePlanReadJson().withApplyColumnTypes(applyColumnTypes)
-                .execute(StreamSources.fromString(s, "json"));
+                .execute(DataResources.fromString(s, "json"));
     }
 
     public static TableColumnar toTableRowOriented(String s, boolean applyColumnTypes,
             Collection<ColumnName> selectedColumns)
     {
         return new TablePlanReadJson().withApplyColumnTypes(applyColumnTypes).withSelectedColumns(selectedColumns)
-                .execute(StreamSources.fromString(s, "json"));
+                .execute(DataResources.fromString(s, "json"));
     }
 
     public static TableColumnar fromJsonColumnar(JsonObject jsonObject)

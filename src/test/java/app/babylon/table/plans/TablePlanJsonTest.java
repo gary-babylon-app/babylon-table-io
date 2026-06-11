@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Test;
 
 import com.google.gson.JsonParser;
 
-import app.babylon.io.StreamSource;
-import app.babylon.io.StreamSources;
+import app.babylon.io.DataResource;
+import app.babylon.io.DataResources;
 import app.babylon.table.TableColumnar;
 import app.babylon.table.TableDescription;
 import app.babylon.table.TableName;
@@ -246,9 +246,9 @@ public class TablePlanJsonTest
         return JsonParser.parseString(json).toString();
     }
 
-    private static StreamSource jsonSource(String json)
+    private static DataResource jsonSource(String json)
     {
-        return StreamSources.fromString(json, "json");
+        return DataResources.fromString(json, "json");
     }
 
     private static String columnarJsonWithColumnTypes()

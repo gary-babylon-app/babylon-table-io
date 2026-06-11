@@ -15,7 +15,7 @@ import org.dhatim.fastexcel.reader.ReadingOptions;
 import org.dhatim.fastexcel.reader.Row;
 import org.junit.jupiter.api.Test;
 
-import app.babylon.io.StreamSource;
+import app.babylon.io.DataResource;
 import app.babylon.table.TableColumnar;
 import app.babylon.table.TableName;
 import app.babylon.table.Tables;
@@ -128,9 +128,9 @@ class TableSinkExcelTest
                 LOCAL_DATE_VALUE, STRING_VALUE);
     }
 
-    private static StreamSource streamSource(byte[] bytes)
+    private static DataResource streamSource(byte[] bytes)
     {
-        return new StreamSource()
+        return new DataResource()
         {
             @Override
             public String getName()
