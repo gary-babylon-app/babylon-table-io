@@ -11,12 +11,26 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.apache.pdfbox.cos.COSArray;
+import org.apache.pdfbox.cos.COSBase;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDDocumentCatalog;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDNumberTreeNode;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDMarkInfo;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDParentTreeValue;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureElement;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureNode;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureTreeRoot;
+import org.apache.pdfbox.pdmodel.documentinterchange.taggedpdf.PDTableAttributeObject;
+import org.apache.pdfbox.pdmodel.documentinterchange.taggedpdf.StandardStructureTypes;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
@@ -164,10 +178,15 @@ public final class RecordWriterPdf
             {
                 document.getDocumentInformation().setCustomMetadataValue("DocumentId", documentId);
             }
+            TaggedPdf tags = TaggedPdf.start(document);
+            TaggedTable headerTags = tags.table(header);
+            TaggedTable tableTags = tags.table(table);
+            TaggedTable footerTags = tags.table(footer);
             for (int row = 0; row < table.getRowCount(); ++row)
             {
-                addRowPage(document, table, header, footer, row);
+                addRowPage(document, tags, table, header, footer, tableTags, headerTags, footerTags, row);
             }
+            tags.finish();
             return document;
         }
         catch (IOException e)
@@ -176,19 +195,30 @@ public final class RecordWriterPdf
         }
     }
 
-    private static void addRowPage(PDDocument document, TableColumnar table, TableColumnar header, TableColumnar footer,
-            int row) throws IOException
+    private static void addRowPage(PDDocument document, TaggedPdf tags, TableColumnar table, TableColumnar header,
+            TableColumnar footer, TaggedTable tableTags, TaggedTable headerTags, TaggedTable footerTags, int row)
+            throws IOException
     {
         PDPage page = new PDPage(PAGE_SIZE);
         document.addPage(page);
+        tags.page(page);
         try (PDPageContentStream content = new PDPageContentStream(document, page))
         {
             float y = PAGE_SIZE.getHeight() - MARGIN;
             int footerLineCount = footerLineCount(footer, row);
             float footerTop = MARGIN + METADATA_LINE_HEIGHT * (footerLineCount + 2.0f);
-            y = drawHeader(content, header, row, y);
+            y = drawHeader(content, tags, header, headerTags, row, y);
             String title = table.getName() + (table.getRowCount() == 1 ? "" : " row " + (row + 1));
-            drawCenteredText(content, TITLE_FONT, TITLE_FONT_SIZE, y, title);
+            float titleY = y;
+            if (row == 0)
+            {
+                tags.markedText(content, tableTags.title(),
+                        () -> drawCenteredText(content, TITLE_FONT, TITLE_FONT_SIZE, titleY, title));
+            }
+            else
+            {
+                tags.artifact(content, () -> drawCenteredText(content, TITLE_FONT, TITLE_FONT_SIZE, titleY, title));
+            }
             y -= LINE_HEIGHT * 1.8f;
             String description = table.getDescription() == null ? "" : clean(table.getDescription().getValue());
             if (!description.isEmpty())
@@ -198,11 +228,21 @@ public final class RecordWriterPdf
                         PAGE_SIZE.getWidth() - 2.0f * MARGIN))
                 {
                     lastDescriptionY = y;
-                    drawCenteredText(content, VALUE_FONT, DESCRIPTION_FONT_SIZE, y, line);
+                    float lineY = y;
+                    if (row == 0)
+                    {
+                        tags.markedText(content, tableTags.description(),
+                                () -> drawCenteredText(content, VALUE_FONT, DESCRIPTION_FONT_SIZE, lineY, line));
+                    }
+                    else
+                    {
+                        tags.artifact(content,
+                                () -> drawCenteredText(content, VALUE_FONT, DESCRIPTION_FONT_SIZE, lineY, line));
+                    }
                     y -= LINE_HEIGHT * 1.2f;
                 }
                 float separatorY = lastDescriptionY - LINE_HEIGHT * 0.55f;
-                drawSeparator(content, separatorY);
+                tags.artifact(content, () -> drawSeparator(content, separatorY));
                 y = separatorY - LINE_HEIGHT * 6.2f;
             }
 
@@ -220,9 +260,10 @@ public final class RecordWriterPdf
                 {
                     break;
                 }
-                y = drawKeyValue(content, columnNames[i].getValue(), columns[i].toString(row, SETTINGS), valueLeft, y);
+                y = drawKeyValue(content, tags, row == 0 ? tableTags.headers()[i] : null, tableTags.cell(row, i),
+                        columnNames[i].getValue(), columns[i].toString(row, SETTINGS), valueLeft, y);
             }
-            drawFooter(content, footer, row);
+            drawFooter(content, tags, footer, footerTags, row);
         }
     }
 
@@ -246,8 +287,8 @@ public final class RecordWriterPdf
         }
     }
 
-    private static float drawHeader(PDPageContentStream content, TableColumnar header, int row, float y)
-            throws IOException
+    private static float drawHeader(PDPageContentStream content, TaggedPdf tags, TableColumnar header,
+            TaggedTable headerTags, int row, float y) throws IOException
     {
         if (header == null || header.getRowCount() == 0)
         {
@@ -277,28 +318,67 @@ public final class RecordWriterPdf
             {
                 String label = label(headerLabel(columnNames[i].getValue()));
                 float labelX = labelRight - textWidth(VALUE_FONT, METADATA_FONT_SIZE, label);
-                drawText(content, VALUE_FONT, METADATA_FONT_SIZE, Math.max(MARGIN, labelX), y, label);
-                drawText(content, VALUE_FONT, METADATA_FONT_SIZE, valueX, y, value);
+                int column = i;
+                float lineY = y;
+                float labelLeft = Math.max(MARGIN, labelX);
+                if (row == 0)
+                {
+                    tags.markedText(content, headerTags.headers()[column],
+                            () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, labelLeft, lineY, label));
+                    tags.markedText(content, headerTags.cell(0, column),
+                            () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, valueX, lineY, value));
+                }
+                else
+                {
+                    tags.artifact(content,
+                            () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, labelLeft, lineY, label));
+                    tags.artifact(content,
+                            () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, valueX, lineY, value));
+                }
                 y -= METADATA_LINE_HEIGHT;
             }
         }
         float separatorY = y + METADATA_LINE_HEIGHT * 0.45f;
-        drawSeparator(content, separatorY);
+        tags.artifact(content, () -> drawSeparator(content, separatorY));
         return separatorY - METADATA_LINE_HEIGHT * 1.6f;
     }
 
-    private static void drawFooter(PDPageContentStream content, TableColumnar footer, int row) throws IOException
+    private static void drawFooter(PDPageContentStream content, TaggedPdf tags, TableColumnar footer,
+            TaggedTable footerTags, int row) throws IOException
     {
-        List<String> lines = footerLines(footer, row);
-        if (lines.isEmpty())
+        if (footer == null || footer.getRowCount() == 0)
         {
             return;
         }
-        drawSeparator(content, MARGIN + METADATA_LINE_HEIGHT * (lines.size() + 0.75f));
-        float y = MARGIN + METADATA_LINE_HEIGHT * (lines.size() - 1);
-        for (String line : lines)
+        int footerRow = Math.min(row, footer.getRowCount() - 1);
+        ColumnName[] columnNames = footer.getColumnNames();
+        Column[] columns = footer.getColumns();
+        List<FooterField> fields = footerFields(columnNames, columns, footerRow);
+        if (fields.isEmpty())
         {
-            drawText(content, VALUE_FONT, METADATA_FONT_SIZE, MARGIN, y, line);
+            return;
+        }
+        tags.artifact(content, () -> drawSeparator(content, MARGIN + METADATA_LINE_HEIGHT * (fields.size() + 0.75f)));
+        float y = MARGIN + METADATA_LINE_HEIGHT * (fields.size() - 1);
+        float labelLeft = MARGIN;
+        float valueLeft = footerValueLeft(fields);
+        for (FooterField field : fields)
+        {
+            float lineY = y;
+            if (row == 0)
+            {
+                tags.markedText(content, footerTags.headers()[field.column()],
+                        () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, labelLeft, lineY, field.label()));
+                tags.markedText(content, footerTags.cell(0, field.column()),
+                        () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, valueLeft, lineY, field.value()));
+            }
+            else
+            {
+                tags.artifact(content,
+                        () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, labelLeft, lineY, field.label()));
+                tags.artifact(content,
+                        () -> drawText(content, VALUE_FONT, METADATA_FONT_SIZE, valueLeft, lineY, field.value()));
+            }
             y -= METADATA_LINE_HEIGHT;
         }
     }
@@ -322,6 +402,30 @@ public final class RecordWriterPdf
     private static List<String> footerLines(TableColumnar footer, int row) throws IOException
     {
         return metadataLines(footer, row);
+    }
+
+    private static List<FooterField> footerFields(ColumnName[] columnNames, Column[] columns, int row)
+    {
+        List<FooterField> fields = new ArrayList<>();
+        for (int i = 0; i < columns.length; ++i)
+        {
+            String value = clean(columns[i].toString(row, SETTINGS));
+            if (!value.isEmpty())
+            {
+                fields.add(new FooterField(i, label(footerLabel(columnNames[i].getValue())), value));
+            }
+        }
+        return fields;
+    }
+
+    private static float footerValueLeft(List<FooterField> fields) throws IOException
+    {
+        float labelWidth = 0.0f;
+        for (FooterField field : fields)
+        {
+            labelWidth = Math.max(labelWidth, textWidth(VALUE_FONT, METADATA_FONT_SIZE, field.label()));
+        }
+        return MARGIN + labelWidth + GAP;
     }
 
     private static List<String> metadataLines(TableColumnar table, int row) throws IOException
@@ -367,17 +471,28 @@ public final class RecordWriterPdf
         return MARGIN + labelWidth + BODY_GAP;
     }
 
-    private static float drawKeyValue(PDPageContentStream content, String label, String value, float valueLeft, float y)
-            throws IOException
+    private static float drawKeyValue(PDPageContentStream content, TaggedPdf tags, PDStructureElement labelElement,
+            PDStructureElement valueElement, String label, String value, float valueLeft, float y) throws IOException
     {
         float valueRight = PAGE_SIZE.getWidth() - MARGIN;
         float valueWidth = valueRight - valueLeft;
         List<String> lines = wrap(clean(value), VALUE_FONT, FONT_SIZE, valueWidth);
 
-        drawText(content, LABEL_FONT, FONT_SIZE, MARGIN, y, label(label));
+        if (labelElement == null)
+        {
+            tags.artifact(content, () -> drawText(content, LABEL_FONT, FONT_SIZE, MARGIN, y, label(label)));
+        }
+        else
+        {
+            tags.markedText(content, labelElement,
+                    () -> drawText(content, LABEL_FONT, FONT_SIZE, MARGIN, y, label(label)));
+        }
         for (int i = 0; i < lines.size(); ++i)
         {
-            drawText(content, VALUE_FONT, FONT_SIZE, valueLeft, y - (i * LINE_HEIGHT), lines.get(i));
+            float lineY = y - (i * LINE_HEIGHT);
+            String line = lines.get(i);
+            tags.markedText(content, valueElement,
+                    () -> drawText(content, VALUE_FONT, FONT_SIZE, valueLeft, lineY, line));
         }
         return y - Math.max(1, lines.size()) * LINE_HEIGHT;
     }
@@ -572,5 +687,163 @@ public final class RecordWriterPdf
     private static String label(String text)
     {
         return clean(text) + ":";
+    }
+
+    private record FooterField(int column, String label, String value)
+    {
+    }
+
+    private record TaggedTable(PDStructureElement title, PDStructureElement description, PDStructureElement[] headers,
+            List<PDStructureElement[]> bodyRows)
+    {
+        PDStructureElement cell(int row, int column)
+        {
+            return this.bodyRows.get(row)[column];
+        }
+    }
+
+    private static final class TaggedPdf
+    {
+        private final PDDocument document;
+        private final PDStructureTreeRoot root;
+        private final PDStructureElement documentElement;
+        private final Map<Integer, PDParentTreeValue> parentTreeNumbers = new HashMap<>();
+        private PDPage page;
+        private COSArray pageParentTree;
+        private int nextMcid;
+
+        private TaggedPdf(PDDocument document, PDStructureTreeRoot root, PDStructureElement documentElement)
+        {
+            this.document = document;
+            this.root = root;
+            this.documentElement = documentElement;
+        }
+
+        static TaggedPdf start(PDDocument document)
+        {
+            PDDocumentCatalog catalog = document.getDocumentCatalog();
+            PDMarkInfo markInfo = new PDMarkInfo();
+            markInfo.setMarked(true);
+            markInfo.setSuspect(false);
+            catalog.setMarkInfo(markInfo);
+            catalog.setLanguage("en-GB");
+
+            PDStructureTreeRoot root = new PDStructureTreeRoot();
+            catalog.setStructureTreeRoot(root);
+
+            PDStructureElement documentElement = new PDStructureElement(StandardStructureTypes.DOCUMENT, root);
+            root.appendKid(documentElement);
+            return new TaggedPdf(document, root, documentElement);
+        }
+
+        void page(PDPage nextPage)
+        {
+            this.page = nextPage;
+            this.pageParentTree = new COSArray();
+            this.nextMcid = 0;
+            int parentTreeKey = this.root.getParentTreeNextKey();
+            this.page.setStructParents(parentTreeKey);
+            this.root.setParentTreeNextKey(parentTreeKey + 1);
+            this.parentTreeNumbers.put(parentTreeKey, new PDParentTreeValue(this.pageParentTree));
+        }
+
+        TaggedTable table(TableColumnar table)
+        {
+            if (table == null || table.getColumnCount() == 0 || table.getRowCount() == 0)
+            {
+                return null;
+            }
+            String title = table.getName().getOriginal();
+            PDStructureElement section = element(StandardStructureTypes.SECT, this.documentElement);
+            section.setTitle(title);
+            PDStructureElement heading = element(StandardStructureTypes.H1, section);
+            PDStructureElement description = element(StandardStructureTypes.P, section);
+            PDStructureElement tableElement = element(StandardStructureTypes.TABLE, section);
+            tableElement.setTitle(title);
+
+            PDStructureElement head = element(StandardStructureTypes.T_HEAD, tableElement);
+            PDStructureElement headRow = element(StandardStructureTypes.TR, head);
+            PDStructureElement[] headers = new PDStructureElement[table.getColumnCount()];
+            for (int column = 0; column < headers.length; ++column)
+            {
+                headers[column] = columnHeader(headRow);
+            }
+
+            PDStructureElement body = element(StandardStructureTypes.T_BODY, tableElement);
+            List<PDStructureElement[]> bodyRows = new ArrayList<>();
+            for (int row = 0; row < table.getRowCount(); ++row)
+            {
+                PDStructureElement bodyRow = element(StandardStructureTypes.TR, body);
+                PDStructureElement[] cells = new PDStructureElement[table.getColumnCount()];
+                for (int column = 0; column < cells.length; ++column)
+                {
+                    cells[column] = element(StandardStructureTypes.TD, bodyRow);
+                }
+                bodyRows.add(cells);
+            }
+            return new TaggedTable(heading, description, headers, bodyRows);
+        }
+
+        private PDStructureElement element(String type, PDStructureNode parent)
+        {
+            PDStructureElement element = new PDStructureElement(type, parent);
+            parent.appendKid(element);
+            return element;
+        }
+
+        private PDStructureElement columnHeader(PDStructureNode parent)
+        {
+            PDStructureElement element = element(StandardStructureTypes.TH, parent);
+            PDTableAttributeObject attributes = new PDTableAttributeObject();
+            attributes.setScope(PDTableAttributeObject.SCOPE_COLUMN);
+            element.addAttribute(attributes);
+            return element;
+        }
+
+        void markedText(PDPageContentStream content, PDStructureElement element, DrawOperation draw) throws IOException
+        {
+            if (element == null)
+            {
+                artifact(content, draw);
+                return;
+            }
+            int mcid = this.nextMcid++;
+            element.setPage(this.page);
+            element.appendKid(mcid);
+            ensureParentTreeSlot(mcid);
+            this.pageParentTree.set(mcid, element);
+
+            content.beginMarkedContent(COSName.getPDFName(element.getStandardStructureType()), mcid);
+            draw.draw();
+            content.endMarkedContent();
+        }
+
+        void artifact(PDPageContentStream content, DrawOperation draw) throws IOException
+        {
+            content.beginMarkedContent(COSName.ARTIFACT);
+            draw.draw();
+            content.endMarkedContent();
+        }
+
+        void finish() throws IOException
+        {
+            PDNumberTreeNode parentTree = new PDNumberTreeNode(PDParentTreeValue.class);
+            parentTree.setNumbers(this.parentTreeNumbers);
+            this.root.setParentTree(parentTree);
+        }
+
+        private void ensureParentTreeSlot(int mcid)
+        {
+            while (this.pageParentTree.size() <= mcid)
+            {
+                this.pageParentTree.add((COSBase) null);
+            }
+        }
+
+        @FunctionalInterface
+        interface DrawOperation
+        {
+            void draw() throws IOException;
+        }
     }
 }
